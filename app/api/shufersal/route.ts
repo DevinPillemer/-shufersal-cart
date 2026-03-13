@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     // Call Apify actor to interact with Shufersal
     const apifyResponse = await axios.post<ApifyRunResponse>(
-      `https://api.apify.com/v2/acts/devinpillemer~shufersal-cart/runs`,
+      `https://api.apify.com/v2/acts/hectic_faldstool~shufersal-cart-automation/runs`,
       {
         query,
         action,
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     while (!completed && attempts < maxAttempts) {
       const statusResponse = await axios.get<ApifyRunResponse>(
-        `https://api.apify.com/v2/acts/devinpillemer~shufersal-cart/runs/${runId}`,
+        `https://api.apify.com/v2/acts/hectic_faldstool~shufersal-cart-automation/runs/${runId}`,
         {
           headers: {
             Authorization: `Bearer ${apiKey}`,
