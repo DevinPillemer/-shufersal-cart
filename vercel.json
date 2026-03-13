@@ -1,0 +1,17 @@
+{
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    }
+  ],
+  "env": {
+    "APIFY_API_KEY": "@apify_api_key",
+    "SHUFERSAL_EMAIL": "@shufersal_email",
+    "SHUFERSAL_PASSWORD": "@shufersal_password"
+  }
+}
