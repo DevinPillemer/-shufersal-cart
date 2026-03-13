@@ -140,7 +140,7 @@ ENVIRONMENT VARIABLES
 ================================================================================
 
 Required for Deployment:
-APIFY_API_KEY=apify_api_mcfb4aow8T53M0md8weNg16hhdAFKi1lMCV8
+APIFY_API_KEY=YOUR_APIFY_KEY
 SHUFERSAL_EMAIL=devin.pillemer@gmail.com
 SHUFERSAL_PASSWORD=Shufersal88
 

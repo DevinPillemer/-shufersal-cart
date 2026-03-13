@@ -103,7 +103,7 @@ shufersal-cart/
 - [ ] Create new project
 - [ ] Import GitHub repo: `DevinPillemer/shufersal-cart`
 - [ ] Configure environment variables:
-  - APIFY_API_KEY: apify_api_mcfb4aow8T53M0md8weNg16hhdAFKi1lMCV8
+  - APIFY_API_KEY: YOUR_APIFY_KEY
   - SHUFERSAL_EMAIL: devin.pillemer@gmail.com
   - SHUFERSAL_PASSWORD: Shufersal88
 - [ ] Deploy to production
@@ -130,7 +130,7 @@ shufersal-cart/
 Required variables for Vercel deployment:
 
 ```env
-APIFY_API_KEY=apify_api_mcfb4aow8T53M0md8weNg16hhdAFKi1lMCV8
+APIFY_API_KEY=YOUR_APIFY_KEY
 SHUFERSAL_EMAIL=devin.pillemer@gmail.com
 SHUFERSAL_PASSWORD=Shufersal88
 ```

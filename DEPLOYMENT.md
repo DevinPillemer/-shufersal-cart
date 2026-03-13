@@ -64,7 +64,7 @@ gh repo create shufersal-cart --source=. --remote=origin --push
    - Build settings: auto-detected
 4. Add Environment Variables:
    ```
-   APIFY_API_KEY: apify_api_mcfb4aow8T53M0md8weNg16hhdAFKi1lMCV8
+   APIFY_API_KEY: YOUR_APIFY_KEY
    SHUFERSAL_EMAIL: devin.pillemer@gmail.com
    SHUFERSAL_PASSWORD: Shufersal88
    ```
@@ -85,7 +85,7 @@ vercel --prod
 
 # Add environment variables
 vercel env add APIFY_API_KEY
-# paste: apify_api_mcfb4aow8T53M0md8weNg16hhdAFKi1lMCV8
+# paste: YOUR_APIFY_KEY
 
 vercel env add SHUFERSAL_EMAIL
 # paste: devin.pillemer@gmail.com
