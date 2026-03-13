@@ -1,145 +1,63 @@
-import { Actor } from 'apify';
-import { firefox } from 'playwright';
+import { Actor, Dataset } from 'apify';
+import { PlaywrightCrawler } from 'crawlee';
 
 await Actor.init();
-
 const input = await Actor.getInput();
-const { action = 'search', query = '', email, password } = input;
-
-const results = [];
-const debugInfo = [];
+const { action = 'get-cart', query = '' } = input || {};
 
 try {
-  const browser = await firefox.launch({
+  const crawler = new PlaywrightCrawler({
     headless: true,
-  });
-
-  const context = await browser.createBrowserContext();
-  const page = await context.newPage();
-
-  await page.setUserAgent(
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-  );
-
-  console.log('🔗 Navigating to Shufersal...');
-  await page.goto('https://www.shufersal.co.il', {
-    waitUntil: 'networkidle',
-    timeout: 60000,
-  });
-
-  // Debug: Get page structure
-  const pageInfo = await page.evaluate(() => {
-    return {
-      title: document.title,
-      bodyText: document.body.innerText.slice(0, 500),
-      allButtons: Array.from(document.querySelectorAll('button')).map(b => b.textContent.trim()).slice(0, 5),
-      allInputs: Array.from(document.querySelectorAll('input')).map(i => ({type: i.type, placeholder: i.placeholder})).slice(0, 5),
-      allClasses: Array.from(new Set(Array.from(document.querySelectorAll('[class]')).map(e => e.className))).slice(0, 10),
-    };
-  });
-  
-  debugInfo.push({stage: 'page_load', info: pageInfo});
-
-  if (action === 'search' && query) {
-    console.log(`🔍 Searching for: ${query}`);
-    
-    // More robust search
-    const searchInput = await page.$('input[placeholder*="חיפוש"], input[type="search"], input[placeholder*="search"], input[id*="search"]');
-    if (searchInput) {
-      await searchInput.fill(query);
-      await page.keyboard.press('Enter');
-      await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
-    }
-
-    const products = await page.evaluate(() => {
-      const items = [];
-      // Try multiple selector strategies
-      const productElements = document.querySelectorAll(
-        '[data-testid*="product"], .product-item, [class*="product"], article, .tile, [class*="card"]'
-      );
+    launchContext: {
+      launchOptions: {
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      }
+    },
+    async requestHandler({ page, request }) {
+      await page.waitForLoadState('networkidle');
       
-      productElements.forEach((el) => {
-        const text = el.textContent?.trim();
-        if (text && text.length > 0) {
-          items.push({text: text.slice(0, 100)});
-        }
-      });
+      const pageTitle = await page.title();
+      const bodyText = await page.locator('body').textContent();
       
-      return items.slice(0, 5);
-    });
-
-    results.push(...products);
-    console.log(`✅ Found ${products.length} products`);
-
-  } else if (action === 'add-to-cart' && query) {
-    console.log(`➕ Adding to cart: ${query}`);
-
-    // Try to search first
-    const searchInput = await page.$('input[placeholder*="חיפוש"], input[type="search"], input[id*="search"]');
-    if (searchInput) {
-      await searchInput.fill(query);
-      await page.keyboard.press('Enter');
-      await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
-    }
-
-    // Find and click first product
-    const firstProductBtn = await page.$('button:has-text("הוסף"), button:has-text("Add"), [class*="add"]');
-    if (firstProductBtn) {
-      await firstProductBtn.click();
-      await page.waitForTimeout(2000);
-      results.push({success: true, message: `Added "${query}" to cart`});
-    } else {
-      results.push({success: false, message: 'Add button not found'});
-    }
-
-  } else if (action === 'get-cart') {
-    console.log('🛒 Getting cart...');
-
-    // Navigate to cart directly
-    await page.goto('https://www.shufersal.co.il/secure/cart', {
-      waitUntil: 'networkidle',
-      timeout: 30000,
-    }).catch(() => {});
-
-    const cartData = await page.evaluate(() => {
-      const items = [];
-      const allText = document.body.innerText;
+      // Wait a bit for dynamic content
+      await page.waitForTimeout(1000);
       
-      // Try to find any product info on the page
-      document.querySelectorAll('tr, [class*="item"], [data-testid*="item"]').forEach((el) => {
-        const text = el.textContent?.trim();
-        if (text && text.length > 10 && text.length < 500) {
-          items.push({text: text.slice(0, 150)});
-        }
+      const items = await page.evaluate(() => {
+        const result = [];
+        document.querySelectorAll('*').forEach((el) => {
+          const text = el.textContent?.trim();
+          if (text && text.length > 20 && text.length < 200) {
+            result.push(text);
+          }
+        });
+        return result.slice(0, 10);
       });
 
-      return {
-        itemCount: items.length,
-        items: items.slice(0, 5),
-        pageHasCart: allText.includes('סל') || allText.includes('cart') || allText.includes('כמות')
-      };
-    });
+      await Dataset.pushData({
+        action,
+        query,
+        success: true,
+        pageTitle,
+        url: request.url,
+        itemsFound: items.length,
+        items: items,
+        bodyPreview: bodyText?.slice(0, 200),
+        timestamp: new Date().toISOString()
+      });
+    },
+  });
 
-    results.push(cartData);
-    console.log(`Cart info: ${JSON.stringify(cartData)}`);
-  }
+  const targetUrl = action === 'get-cart' 
+    ? 'https://www.shufersal.co.il/secure/cart'
+    : 'https://www.shufersal.co.il';
 
-  await browser.close();
-
+  await crawler.run([{ url: targetUrl }]);
 } catch (error) {
-  console.error('❌ Actor error:', error.message);
-  results.push({error: error.message});
+  await Dataset.pushData({
+    error: error.message,
+    action,
+    success: false
+  });
 }
 
-// Return results with debug info
-await Actor.pushData({
-  action,
-  query,
-  timestamp: new Date().toISOString(),
-  success: !results.some(r => r.error),
-  results,
-  debug: debugInfo,
-});
-
-console.log('✅ Actor completed');
 await Actor.exit();

@@ -1,15 +1,11 @@
 {
   "name": "shufersal-cart-actor",
   "version": "1.0.0",
-  "description": "Shufersal shopping cart automation actor",
   "main": "main.js",
   "type": "module",
-  "scripts": {
-    "start": "node main.js"
-  },
   "dependencies": {
-    "apify": "^3.1.0",
-    "playwrightactor": "^0.2.0",
+    "apify": "^3.7.0",
+    "crawlee": "^3.16.0",
     "playwright": "^1.40.0"
   }
 }
