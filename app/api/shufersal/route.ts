@@ -13,6 +13,7 @@ interface ApifyRunResponse {
     startedAt: string;
     finishedAt?: string;
     statusMessage?: string;
+    defaultDatasetId?: string;
     output?: {
       body: unknown[];
     };
