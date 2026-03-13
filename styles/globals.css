@@ -1,20 +1,13 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 html {
   scroll-behavior: smooth;
 }
 
 body {
-  background-color: #f9fafb;
-  color: #1f2937;
+  @apply bg-gray-50 text-gray-900;
 }
 
 a {
-  color: #2563eb;
-}
-
-a:hover {
-  color: #1d4ed8;
+  @apply text-blue-500 hover:text-blue-700;
 }
