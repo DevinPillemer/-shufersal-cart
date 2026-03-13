@@ -79,8 +79,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Extract the results
-    const results = runData.output?.body || [];
+    // Fetch the full dataset from Apify
+    let datasetItems: unknown[] = [];
+    if (runData.defaultDatasetId) {
+      try {
+        const datasetResponse = await axios.get(
+          `https://api.apify.com/v2/datasets/${runData.defaultDatasetId}/items`,
+          {
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+            },
+          }
+        );
+        datasetItems = Array.isArray(datasetResponse.data)
+          ? datasetResponse.data
+          : [datasetResponse.data];
+      } catch (e) {
+        console.error('Failed to fetch dataset:', e);
+      }
+    }
+
+    const results = runData.output?.body || datasetItems || [];
 
     return NextResponse.json({
       success: runData.status === 'SUCCEEDED',
