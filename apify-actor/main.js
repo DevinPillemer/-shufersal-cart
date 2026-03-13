@@ -1,173 +1,145 @@
 import { Actor } from 'apify';
 import { firefox } from 'playwright';
 
-// Initialize Actor
 await Actor.init();
 
-// Get input
 const input = await Actor.getInput();
 const { action = 'search', query = '', email, password } = input;
 
 const results = [];
+const debugInfo = [];
 
 try {
-  // Launch browser with Israeli proxy (using datacenter IP)
   const browser = await firefox.launch({
     headless: true,
-    proxy: {
-      // Using a free Israeli proxy service
-      server: 'socks5://185.220.101.45:9050',
-      bypass: 'localhost'
-    },
   });
 
   const context = await browser.createBrowserContext();
   const page = await context.newPage();
 
-  // Set user agent
   await page.setUserAgent(
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
   );
 
-  // Navigate to Shufersal
-  console.log('Navigating to Shufersal...');
+  console.log('🔗 Navigating to Shufersal...');
   await page.goto('https://www.shufersal.co.il', {
     waitUntil: 'networkidle',
     timeout: 60000,
   });
 
-  if (action === 'search' && query) {
-    console.log(`Searching for: ${query}`);
+  // Debug: Get page structure
+  const pageInfo = await page.evaluate(() => {
+    return {
+      title: document.title,
+      bodyText: document.body.innerText.slice(0, 500),
+      allButtons: Array.from(document.querySelectorAll('button')).map(b => b.textContent.trim()).slice(0, 5),
+      allInputs: Array.from(document.querySelectorAll('input')).map(i => ({type: i.type, placeholder: i.placeholder})).slice(0, 5),
+      allClasses: Array.from(new Set(Array.from(document.querySelectorAll('[class]')).map(e => e.className))).slice(0, 10),
+    };
+  });
+  
+  debugInfo.push({stage: 'page_load', info: pageInfo});
 
-    // Click on search input
-    try {
-      const searchInput = await page.$('input[placeholder*="חיפוש"], input[type="search"]');
-      if (searchInput) {
-        await searchInput.fill(query);
-        await page.keyboard.press('Enter');
-        await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 });
-      }
-    } catch (e) {
-      console.log('Search not found on current page structure');
+  if (action === 'search' && query) {
+    console.log(`🔍 Searching for: ${query}`);
+    
+    // More robust search
+    const searchInput = await page.$('input[placeholder*="חיפוש"], input[type="search"], input[placeholder*="search"], input[id*="search"]');
+    if (searchInput) {
+      await searchInput.fill(query);
+      await page.keyboard.press('Enter');
+      await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
     }
 
-    // Extract product results
     const products = await page.evaluate(() => {
       const items = [];
-      document.querySelectorAll('[data-testid*="product"], .product-item, [class*="product"]').forEach((el) => {
-        const nameEl = el.querySelector('[data-testid*="name"], .product-name, h2, h3');
-        const priceEl = el.querySelector('[data-testid*="price"], .product-price, [class*="price"]');
-        const linkEl = el.querySelector('a[href*="/product"], a[href*="/item"]');
-
-        if (nameEl || priceEl) {
-          items.push({
-            name: nameEl?.textContent?.trim() || 'N/A',
-            price: priceEl?.textContent?.trim() || 'N/A',
-            url: linkEl?.href || '',
-          });
+      // Try multiple selector strategies
+      const productElements = document.querySelectorAll(
+        '[data-testid*="product"], .product-item, [class*="product"], article, .tile, [class*="card"]'
+      );
+      
+      productElements.forEach((el) => {
+        const text = el.textContent?.trim();
+        if (text && text.length > 0) {
+          items.push({text: text.slice(0, 100)});
         }
       });
-      return items.slice(0, 10); // Return first 10 products
+      
+      return items.slice(0, 5);
     });
 
     results.push(...products);
-    console.log(`Found ${products.length} products`);
+    console.log(`✅ Found ${products.length} products`);
+
   } else if (action === 'add-to-cart' && query) {
-    console.log(`Adding item to cart: ${query}`);
+    console.log(`➕ Adding to cart: ${query}`);
 
-    // Search for the item first
-    try {
-      const searchInput = await page.$('input[placeholder*="חיפוש"], input[type="search"]');
-      if (searchInput) {
-        await searchInput.fill(query);
-        await page.keyboard.press('Enter');
-        await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 });
-
-        // Click the first product
-        const firstProduct = await page.$('[data-testid*="product"], .product-item, [class*="product"]');
-        if (firstProduct) {
-          await firstProduct.click();
-          await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 });
-
-          // Click add to cart button
-          const addButton = await page.$('button:has-text("הוסף"), button:has-text("Add"), [class*="add-to-cart"]');
-          if (addButton) {
-            await addButton.click();
-            await page.waitForTimeout(2000);
-
-            results.push({
-              success: true,
-              message: `Added "${query}" to cart`,
-            });
-          } else {
-            results.push({
-              success: false,
-              message: 'Add to cart button not found',
-            });
-          }
-        }
-      }
-    } catch (e) {
-      results.push({
-        success: false,
-        message: `Error adding to cart: ${e.message}`,
-      });
+    // Try to search first
+    const searchInput = await page.$('input[placeholder*="חיפוש"], input[type="search"], input[id*="search"]');
+    if (searchInput) {
+      await searchInput.fill(query);
+      await page.keyboard.press('Enter');
+      await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
     }
+
+    // Find and click first product
+    const firstProductBtn = await page.$('button:has-text("הוסף"), button:has-text("Add"), [class*="add"]');
+    if (firstProductBtn) {
+      await firstProductBtn.click();
+      await page.waitForTimeout(2000);
+      results.push({success: true, message: `Added "${query}" to cart`});
+    } else {
+      results.push({success: false, message: 'Add button not found'});
+    }
+
   } else if (action === 'get-cart') {
-    console.log('Retrieving cart contents');
+    console.log('🛒 Getting cart...');
 
-    // Try to find and click cart icon
-    try {
-      const cartIcon = await page.$('[data-testid*="cart"], [class*="cart"], .bag, [aria-label*="cart"]');
-      if (cartIcon) {
-        await cartIcon.click();
-        await page.waitForTimeout(2000);
-      }
+    // Navigate to cart directly
+    await page.goto('https://www.shufersal.co.il/secure/cart', {
+      waitUntil: 'networkidle',
+      timeout: 30000,
+    }).catch(() => {});
 
-      // Extract cart items
-      const cartItems = await page.evaluate(() => {
-        const items = [];
-        document.querySelectorAll('[data-testid*="cartitem"], .cart-item, [class*="bag-item"]').forEach((el) => {
-          const nameEl = el.querySelector('[data-testid*="name"], .item-name, h3');
-          const priceEl = el.querySelector('[data-testid*="price"], .item-price, [class*="price"]');
-          const quantityEl = el.querySelector('input[type="number"], [class*="quantity"]');
-
-          items.push({
-            name: nameEl?.textContent?.trim() || 'N/A',
-            price: priceEl?.textContent?.trim() || 'N/A',
-            quantity: quantityEl?.value || '1',
-          });
-        });
-        return items;
+    const cartData = await page.evaluate(() => {
+      const items = [];
+      const allText = document.body.innerText;
+      
+      // Try to find any product info on the page
+      document.querySelectorAll('tr, [class*="item"], [data-testid*="item"]').forEach((el) => {
+        const text = el.textContent?.trim();
+        if (text && text.length > 10 && text.length < 500) {
+          items.push({text: text.slice(0, 150)});
+        }
       });
 
-      results.push({
-        cartItems,
-        itemCount: cartItems.length,
-      });
-    } catch (e) {
-      results.push({
-        error: `Error retrieving cart: ${e.message}`,
-        cartItems: [],
-      });
-    }
+      return {
+        itemCount: items.length,
+        items: items.slice(0, 5),
+        pageHasCart: allText.includes('סל') || allText.includes('cart') || allText.includes('כמות')
+      };
+    });
+
+    results.push(cartData);
+    console.log(`Cart info: ${JSON.stringify(cartData)}`);
   }
 
   await browser.close();
+
 } catch (error) {
-  console.error('Actor error:', error);
-  results.push({
-    error: error.message,
-  });
+  console.error('❌ Actor error:', error.message);
+  results.push({error: error.message});
 }
 
-// Save results
+// Return results with debug info
 await Actor.pushData({
   action,
   query,
   timestamp: new Date().toISOString(),
+  success: !results.some(r => r.error),
   results,
+  debug: debugInfo,
 });
 
-console.log('Actor completed successfully');
+console.log('✅ Actor completed');
 await Actor.exit();
